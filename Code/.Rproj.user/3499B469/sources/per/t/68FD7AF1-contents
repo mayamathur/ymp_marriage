@@ -1,0 +1,68 @@
+
+########################### MAKE MI DATASETS ########################### 
+
+##### How Much Missing Data? #####
+
+# proportions of missing data
+prop.missing = apply( d, 2, function(x) sum( is.na(x) ) / length(x)  )
+min(prop.missing)
+mean(prop.missing)
+max(prop.missing)
+
+# proportion of subjects with no missing data
+sum( complete.cases(d) ) / nrow(d)
+
+# missing data on exposure
+prop.missing[ names(d) == Xname ]
+
+if ( missingness == "MI" ) {
+  ##### Make Imputations #####
+  library(mice)
+  
+  if ( impute.from.scratch == TRUE ) {
+    ##### Generate Imputations #####
+    ini = mice(d, m=1, maxit = 0 )
+    ini$loggedEvents
+    
+    # check methods
+    ini$method
+    
+    pred = quickpred(d)
+    
+    imps = mice( d, m, predictorMatrix = pred )
+    
+    # any complaints?
+    head(imps$loggedEvents)
+    
+    # first imputed dataset
+    head( complete(imps, 1) )
+    # if this line returns an error about complete() not being applicable
+    #  for a mids objects (which is a lie), restart R
+    
+    # check method
+    imps$method
+    
+    if ( write.results == TRUE ) {
+      
+      # save imputations for reproducibility
+      setwd(stochastic.results.dir)
+      save( imps, file = "imputed_datasets.RData" )
+      
+      # # also save imputed datasets as csvs for Ying
+      # setwd(stochastic.results.dir)
+      # setwd("Imputed datasets as csvs")
+      
+      for (i in 1:m) {
+        write.csv( complete(imps,i),
+                   paste("imputed_dataset_", i, ".csv", sep="") )
+      }
+    }
+    
+  } else {  # if not imputing from scratch
+    
+    # read in existing imputations to avoid running the below code
+    setwd(stochastic.results.dir)
+    load("imputed_datasets.RData" )
+  } 
+}
+

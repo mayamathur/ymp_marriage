@@ -1,0 +1,518 @@
+
+# Contact: Maya Mathur (mmathur@stanford.edu)
+
+
+########################### FN: INTELLIGENTLY FORMAT P-VALUE ###########################
+
+# round while keeping trailing zeroes
+my_round = function(x, digits) {
+  formatC( round( x, digits ), format='f', digits=digits )
+}
+
+
+# star.cutoffs: cutoffs for *, **, ***, etc., in any order
+format_pval = function( p,
+                        digits = 3,
+                        star.cutoffs = NA ) {
+  
+  if (p >= 0.01) string = as.character( my_round( p, digits ) )
+  if (p < 0.01 & p > 10^-5 ) string = formatC( p, format = "E", digits = 2 )
+  if ( p < 10^-5 ) string = "< 1E-05"
+  
+  if ( ! is.na(star.cutoffs) ) {
+    
+    # put in descending order
+    star.cutoffs = sort(star.cutoffs, decreasing = TRUE)
+    
+    for ( i in 1 : length(star.cutoffs) ) {
+      if ( p < star.cutoffs[i] ) string = paste( string, "*", sep="" )
+    }
+  }
+  
+  return(string)
+}
+
+# p = seq( 0, .2, 0.001 )
+# vapply( p, format_pval, "asdf" )
+# vapply( p, function(x) format_pval( x, star.cutoffs = c( 0.01, 0.05) ), "asdf" )
+
+
+
+########################### FN: RECODE VARIABLES DURING DATA PREP ###########################
+
+# recodes binary variables per MIDUS' coding scheme
+recode_binary = function( var.name, original.dat, new.dat ) {
+  
+  # levels of variable (0/1 or 2/1)
+  levels = sort( unique( original.dat[[var.name]] )[ !is.na( unique( original.dat[[var.name]] ) )] )
+  
+  ##### Recode 1/2 variable #####
+  
+  if( all( levels == c(1,2) ) ) {
+    # warn if variable has any values besides the expected 1,2
+    #if( any( !new.dat[[var.name]] %in% c(1,2, NA) ) ) warning( paste( var.name, " had weird values!", sep="" ) )
+    new.dat[[var.name]] = recode( new.dat[[var.name]], "1='b.Yes'; 2='a.No'" )
+  } else if( all( levels == c(0,1) ) ) {
+    # warn if variable has any values besides the expected 1,2
+    #if( any( !new.dat[[var.name]] %in% c(1,2, NA) ) ) warning( paste( var.name, " had weird values!", sep="" ) )
+    new.dat[[var.name]] = recode( new.dat[[var.name]], "1='b.Yes'; 0='a.No'" )
+  } else {
+    warning("Variable does not use 0/1 or 1/2 coding scheme. It is not being recoded.")
+  }
+
+  print( table(original.dat[[var.name]], new.dat[[var.name]], useNA = "ifany") )
+  
+  return(new.dat)
+}
+
+
+# for undoing the above function
+binarize = function(x) {
+  
+  # if the variable is already 0/1, leave it alone
+  # this is used in the Poisson part of analysis functions
+  # so that it can flexibly handle a binary variable coded as factor
+  #  or as 0/1
+  if ( is.numeric(x) &
+       sort( unique(x) )[1] == 0 &
+       sort( unique(x) )[2] == 1 ) return(x)
+  
+  if ( all( levels(as.factor(x)) == c("a.No", "b.Yes") ) ) {
+    x = as.character(x)
+    xbin = rep(NA, length(x))
+    xbin[ x == "b.Yes" ] = 1
+    xbin[ x == "a.No" ] = 0
+    return(xbin)
+  } else {
+    stop("x needs to be either already 0/1 or 'a.No'/'b.Yes'")
+  }
+  
+
+}
+
+# binarize( c(1,1,1,0,1) )
+# binarize( c("a.No", "b.Yes") )
+# binarize(c("No", "Yes"))
+
+########################### FN: POOL IMPUTED SEs VIA RUBIN'S RULES ###########################
+
+# see Marshall "Combining estimates" paper, pg 3
+
+# ests: ests from m imputations
+# ses: ses from m imputations
+rubin_se = function( ests, ses ){
+  
+  m = length(ests)
+  
+  # within-imputation variance
+  Ubar = mean( ses^2 )
+  
+  # between-imputation variance
+  B = (1 / (m-1)) * sum( ( ests - mean(ests) )^2 )
+  
+  # overall SE
+  return( sqrt( Ubar + (1 + (1/m)) * B ) )
+}
+
+
+
+########################### FN: ANALYZE ONE DATASET WITHOUT MISSING DATA ###########################
+
+# pass the CC data (or imputed dataset)
+
+# will run this once for each of three outcome types
+
+# d = dataset
+# X = quoted name of single exposure of interest
+# C = quoted vector of adjusted covariate names
+# Ys = quoted names of all outcomes that are accounted for in Bonferroni correction (not
+#  just those using this link fn)
+# alpha = alpha level
+# resample = Should we draw resamples for multiplicity correction?
+# B = number of resamples
+# model = which model to fit ("OLS", "poisson", or "logistic")
+# TMLE = should we use TMLE?
+
+analyze_CC_dataset = function( d,
+                               X,
+                               C = NA,
+                               Ys, 
+                               alpha = 0.05,
+                               resample = FALSE,
+                               B = 1000,  
+                               model = "OLS",
+                               TMLE = FALSE ) {
+  
+  ##### Fit All Models #####
+  samp.res = dataset_result( d = d,
+                             X = X,
+                             C = C,
+                             Ys = Ys,  # all outcome names
+                             alpha = alpha,
+                             center.stats = FALSE,
+                             bhat.orig = NA,
+                             model = model,
+                             TMLE = TMLE )
+
+  ##### Generate Resamples #####
+  
+  if ( resample == TRUE ) {
+    require(NRejections)
+    
+    resamps = NRejections::resample_resid(  X = X,
+                                            C = C,
+                                            Ys = Ys,
+                                            d = d,
+                                            alpha = alpha,
+                                            resid = samp.res$resid,
+                                            bhat.orig = samp.res$b,
+                                            B=B,
+                                            cores = 8 )
+  } else {
+    resamps = NA
+  }
+  
+  ##### Return All The Things #####
+  return( list( samp.res = samp.res,
+                resamps = resamps ) )
+  
+}
+
+
+
+########################### FN: FIT MODEL FOR ONE DATASET ###########################
+
+# this is a generalization of NRejections::fit_model
+
+fit_model = function( X,
+                      C = NA,
+                      Y,
+                      Ys,  # used for subsetting bhat.orig
+                      d,
+                      center.stats = FALSE,
+                      bhat.orig = NA,  # bhat.orig is a single value now for just the correct Y
+                      model, 
+                      TMLE,
+                      alpha = 0.05 ) {
+  
+  if ( length(X) > 1 ) stop("X must have length 1")
+  
+  # all covariates, including the one of interest
+  if ( all( is.na(C) ) ) covars = X else covars = c( X, C )
+  
+  ################# OLS w/o TMLE ################# 
+  if ( model == "OLS" & TMLE == FALSE ) {
+  
+    if ( all( is.na(C) ) ) m = lm( d[[Y]] ~ d[[X]] )
+    # https://stackoverflow.com/questions/6065826/how-to-do-a-regression-of-a-series-of-variables-without-typing-each-variable-nam
+    else m = lm( d[[Y]] ~ ., data = d[ , covars] )
+    
+    # stats for covariate of interest
+    if ( all( is.na(C) ) ) m.stats = summary(m)$coefficients[ 2, ]
+    else m.stats = summary(m)$coefficients[ X, ]
+    
+    # should we center stats by the original-sample estimates?
+    if( !center.stats ) {
+      b = m.stats[["Estimate"]]
+      tval = m.stats[["t value"]]
+      SE = m.stats[["Std. Error"]]
+    }
+    if( center.stats ) {
+      b = m.stats[["Estimate"]] - bhat.orig[ which(Ys==Y) ]
+      SE = m.stats[["Std. Error"]]
+      tval = b / SE
+    }
+    
+
+    df = nrow(d) - length(covars) - 1
+    pval = 2 * ( 1 - pt( abs( b / SE ), df ) )
+    resids = residuals(m)
+  }
+  
+  
+  ################# Logistic Regression w/o TMLE ################# 
+  if ( model == "logistic" & TMLE == FALSE ) {
+    if ( all( is.na(C) ) ) {
+      m = glm( d[[Y]] ~ d[[X]], family = "binomial" )
+    } else {
+      # https://stackoverflow.com/questions/6065826/how-to-do-a-regression-of-a-series-of-variables-without-typing-each-variable-nam
+      m = glm( d[[Y]] ~ ., data = d[ , covars], family = "binomial" )
+    }
+    
+    # stats for covariate of interest
+    if ( all( is.na(C) ) ) {
+      m.stats = summary(m)$coefficients[ 2, ]
+    } else {
+      m.stats = summary(m)$coefficients[ X, ]
+    } 
+    
+    # NOTE THAT THESE ARE ACTUALLY Z-VALS, NOT TVALS
+    # should we center stats by the original-sample estimates?
+    if( !center.stats ) {
+      b = m.stats[["Estimate"]]
+      tval = m.stats[["z value"]]
+      SE = m.stats[["Std. Error"]]
+    }
+    if( center.stats ) {
+      b = m.stats[["Estimate"]] - bhat.orig[ which(Ys==Y) ]
+      SE = m.stats[["Std. Error"]]
+      tval = b / SE
+    }
+    
+    pval = 2 * ( 1 - pnorm( abs( b / SE ) ) )
+    df = NA
+    resids = NA
+  }
+  
+  
+  ################# Poisson Regression w/o TMLE ################# 
+  if ( model == "poisson" & TMLE == FALSE ) {
+    
+    # if binary variable, make sure it's 0/1 instead of "b.No"/"a.Yes"
+    if ( length( unique( d[[Y]] ) ) == 2 ) tempY = binarize( d[[Y]] )
+    else tempY = d[[Y]]
+    
+    if ( all( is.na(C) ) ) {
+      m = glm( tempY ~ d[[X]], family = "poisson" )
+    } else {
+      # https://stackoverflow.com/questions/6065826/how-to-do-a-regression-of-a-series-of-variables-without-typing-each-variable-nam
+      m = glm( tempY ~ ., data = d[ , covars], family = "poisson" )
+    }
+    
+    # stats for covariate of interest
+    if ( all( is.na(C) ) ) {
+      m.stats = summary(m)$coefficients[ 2, ]
+    } else {
+      m.stats = summary(m)$coefficients[ X, ]
+    } 
+    
+    # should we center stats by the original-sample estimates?
+    if( !center.stats ) {
+      b = m.stats[["Estimate"]]
+      tval = m.stats[["z value"]]  # NOTE THAT THESE ARE ACTUALLY Z-VALS, NOT TVALS
+      SE = m.stats[["Std. Error"]]
+    }
+    if( center.stats ) {
+      b = m.stats[["Estimate"]] - bhat.orig[ which(Ys==Y) ]
+      SE = m.stats[["Std. Error"]]
+      tval = b / SE
+    }
+    
+    pval = 2 * ( 1 - pnorm( abs( b / SE ) ) )
+    df = NA
+    resids = NA
+  }
+  
+
+  ################# OLS w/ TMLE ################# 
+
+  if ( model == "OLS" & TMLE == TRUE ) {
+
+    # if there is missing data (because d is the original data and we're doing CC),
+    #  remove it to avoid complaints from tmle()
+    d = d[ , c(X, Y, Cnames) ]
+    d = d[ complete.cases(d), ]
+    
+    
+    require(tmle)
+    require(SuperLearner)
+
+    # defaults to super-learning
+    mod = tmle( Y = d[[Y]],
+              A = d[[X]],
+              W = d[ , Cnames ] )
+    
+    # for continuous outcome
+    b = mod$estimates$ATE$psi
+    SE = mod$estimates$ATE$var.psi
+    pval = mod$estimates$ATE$pvalue
+
+    # NA because inference will be done by bootstrapping
+    df = NA
+    tval = NA
+
+    resids = NA
+  }
+  
+  
+  ################# Logistic w/ TMLE ################# 
+  
+  # ~~~ BOOKMARK
+  
+  if ( model == "logistic" & TMLE == TRUE ) {
+    
+    #browser()
+    
+    # if there is missing data (because d is the original data and we're doing CC),
+    #  remove it to avoid complaints from tmle()
+    d = d[ , c(X, Y, Cnames) ]
+    d = d[ complete.cases(d), ]
+    
+    
+    require(tmle)
+    require(SuperLearner)
+    
+    # defaults to super-learning
+    mod = tmle( Y = d[[Y]],
+                A = d[[X]],
+                W = d[ , Cnames ],
+                family = "binomial" )
+    
+    # for continuous outcome
+    b = log( mod$estimates$OR$psi )  # log for consistency with non-TMLE code
+    SE = mod$estimates$OR$var.log.psi
+    pval = mod$estimates$OR$pvalue
+    
+    # NA because inference will be done by bootstrapping
+    df = NA
+    tval = NA
+    
+    resids = NA
+  }
+  
+  
+  
+  if ( model == "poisson" & TMLE == TRUE ) {
+  
+    # if there is missing data (because d is the original data and we're doing CC),
+    #  remove it to avoid complaints from tmle()
+    d = d[ , c(X, Y, Cnames) ]
+    d = d[ complete.cases(d), ]
+    
+    
+    require(tmle)
+    require(SuperLearner)
+    
+    # defaults to super-learning
+    mod = tmle( Y = d[[Y]],
+                A = d[[X]],
+                W = d[ , Cnames ],
+                family = "poisson" )
+    
+    # for continuous outcome
+    b = mod$estimates$OR$psi
+    SE = mod$estimates$OR$var.log.psi
+    pval = mod$estimates$OR$pvalue
+    
+    # NA because inference will be done by bootstrapping
+    df = NA
+    tval = NA
+    
+    resids = NA
+  }
+  
+
+  
+  stats = data.frame( outcome = Y,
+                      b = b,
+                      SE = SE,  
+                      df = df,
+                      pval = pval,
+                      tval = tval,
+                      reject = pval < alpha,
+                      n = nrow(d) )  # for CC analyses
+  
+  return( list( stats = stats,
+                resids = as.numeric(resids)
+                ) )
+}
+
+
+
+########################### FN: FIT ONE TYPE OF MODEL (LINK) FOR ALL SPECIFIED Ys ###########################
+
+
+# this is a generalization of NRejections::dataset_result
+# see ?dataset_result in that package for more info
+
+dataset_result = function( d,
+                           X,
+                           C = NA,
+                           Ys,  # all outcome names
+                           alpha = 0.05,
+                           center.stats = TRUE,
+                           bhat.orig = NA,
+                           model = "OLS",
+                           TMLE = FALSE ) { 
+  
+  
+  if ( length(X) > 1 ) stop("X must have length 1")
+  
+  # for each outcome, fit regression model
+  # see if each has p < alpha for covariate of interest
+  if ( any( all( is.na(C) ) ) ) covars = X
+  else covars = c( X, C )
+  
+  # get the correct bhat for the outcome we're using
+  
+  # this is a list of lists:
+  #  length is equal to number of outcomes
+  #  each entry is another list
+  # with elements "pval" (scalar) and "resid" (length matches number of subjects)
+  
+  lists = lapply( X = Ys,
+                  FUN = function(y) fit_model( X = X,
+                                               C = C,
+                                               Y = y,
+                                               Ys = Ys,
+                                               d = d,
+                                               center.stats = center.stats,
+                                               bhat.orig = bhat.orig,
+                                               model = model, 
+                                               TMLE = TMLE,
+                                               alpha = alpha ) )
+  
+  # "flatten" the list of lists
+  u = unlist(lists)
+  pvals = as.vector( u[ names(u) == "stats.pval" ] )
+  tvals = as.vector( u[ names(u) == "stats.tval" ] )
+  bhats = as.vector( u[ names(u) == "stats.b" ] )
+  ses = as.vector( u[ names(u) == "stats.SE" ] )
+
+  
+  # save residuals
+  # names of object u are resid.1, resid.2, ..., hence use of grepl 
+  mat = matrix( u[ grepl( "resid", names(u) ) ], byrow=FALSE, ncol=length(Ys) ) 
+  resid = as.data.frame(mat)
+  names(resid) = Ys
+  
+  # returns vector for number of rejections at each alpha level
+  # length should match length of .alpha
+  n.reject = vapply( X = alpha, FUN = function(a) sum( pvals < a ), FUN.VALUE=-99 )
+  
+  return( list( rej = n.reject,
+                SEs = ses,
+                tvals = tvals,
+                bhats = bhats,
+                pvals = pvals,
+                resid = resid ) )
+}
+
+
+
+########################### FN: INDUCE MCAR MISSINGNESS ###########################
+
+# this was only used for testing the code on fake data
+
+# induce missingness
+# https://stackoverflow.com/questions/18837896/degrading-data-randomly-with-pre-existing-missingness
+
+# del.amount = number of observations in dataset to make missing
+
+degradefunction <- function(x, del.amount){
+  
+  # 1) indicate which cells are NA (works with matrix or df)
+  preNAs     <- is.na(x)
+  # 2) how many cells are eligible to be degraded?
+  OpenSpots  <- prod(dim(x)) - sum(preNAs)
+  # 3) of these, select del.amount for replacement with NA
+  newNas     <- sample(1:OpenSpots, size = del.amount, replace = FALSE)
+  # 4) impute these NAs, ignoring the original NAs
+  x[!preNAs][newNas] <- NA
+  x
+}
+
+
+
+
+
