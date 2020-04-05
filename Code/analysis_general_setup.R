@@ -1,6 +1,65 @@
 
+
+############################## SET UP ############################## 
+
+# # FOR CHANNING USE
+# # location of data
+# data.dir = "/udd/nhych/Marital_status/"
+# data.name = "cc.sas7bdat"
+# 
+# # location of code
+# code.dir = "/udd/nhych/Maya/Code"
+# 
+# # location to save results
+# results.dir = "/udd/nhych/Maya/Results"
+# 
+# # location to save imputations and resamples
+# # (or where to look for them if not running from scratch)
+# stochastic.results.dir = "/udd/nhych/Maya/Results/Objects"
+# 
+# # location of codebook
+# #codebook.dir = "~/Dropbox/Personal computer/Independent studies/Tyler's outcome-wide paper/Linked to OSF (OWP)/Applied example/MIDUS codebooks"
+# 
+# setwd(code.dir)
+# source("helper_applied_example.R")
+# 
+# # read in data
+# setwd(data.dir)
+# 
+# library(sas7bdat)
+# d = read.sas7bdat(data.name)
+
+
+# FOR LOCAL USE
+
+# remove all variables except global ones used in analysis_master.R
+rm(list=setdiff(ls(),
+                c("this.analysis",
+                "analyses",
+                "i")))
+
+
+if (this.analysis == "Marriage - main") restrict = "never.married"
+if (this.analysis == "Divorce - main") restrict = "married"
+if ( grepl(pattern = "cheating", this.analysis) == TRUE ) restrict = "no"
+
+root.dir = "/Users/mmathur/Dropbox/Personal computer/Independent studies/Ying's marriage paper"
+
+setwd(root.dir)
+data.dir = paste(root.dir, "[PRIVATE] Data and results/Data/Raw from Ying", sep="/")
+code.dir = paste(root.dir, "Linked to OSF (YMP)/Code", sep="/")
+results.dir = paste(root.dir, "[PRIVATE] Data and results/Results", this.analysis, sep="/")
+
+codebook.dir = paste(root.dir, "[PRIVATE] Data and results/Data", sep="/")
+
+full.imputeds.dir = paste(root.dir, "[PRIVATE] Data and results/Data/Imputed full datasets as csv", sep="/")
+
+# where to save the imputed datasets that have been appropriately restricted, if needed, 
+#  for this particular analysis
+custom.imputeds.dir = paste(root.dir, "[PRIVATE] Data and results/Data/Imputed restricted datasets as csv", this.analysis, sep="/")
+
+
 ############################## SET VARIABLE NAMES ############################## 
-rm(list=ls())
 
 # this is done first to help us recode and restrict the main dataset
 
@@ -35,12 +94,15 @@ Ybin = c( # common ones
 
 Ycount = NA
 
-Xname = "mars93_2"
+# set either divorce or marriage as the exposure
+if ( grepl(pattern = "Marriage", x = this.analysis) == TRUE ) Xname = "mars93_2"
+if ( grepl(pattern = "Divorce", x = this.analysis) == TRUE ) Xname = "mars93_3"
 
 ##### Set Names of Adjusted Covariates #####
 # abuse_c is very missing, so is only in MI covariate set, not CC
 # Ying's covariate string from Table2_complete_nabs.sas:
 # mars93_2 age nhwhite colled nim89 region2 region3 region4 mdinc2 mdinc3 mdinc4 exam89 alco89 smoke89 act89_d number
+
 Cnames.MI = c( "age",
                "nhwhite",
                "colled",
@@ -58,6 +120,17 @@ Cnames.MI = c( "age",
                "number",
                "abuse_c" )
 
+# for cheating-controlled analyses, also need to control for marital status in '89
+if ( this.analysis %in% c("Marriage - cheating controlled",
+                          "Divorce - cheating controlled") ) {
+  Cnames.MI = c(Cnames.MI,
+                "mars89_2",  # omit one level as reference level
+                "mars89_3",
+                "mars89_4")
+}
+
+
+
 # Ying's covariate string from Table2_mi.sas:
 # mars93_2 age nhwhite colled nim89 abuse_c region2 region3 region4 mdinc2 mdinc3 mdinc4 exam89 alco89 smoke89 act89_d number
 
@@ -69,57 +142,6 @@ analysis.vars = c(Cnames.CC, Cnames.MI, Xname, Ylin, Ybin, Ycount)
 
 
 ############################## READ IN DATA ############################## 
-
-# # FOR CHANNING USE
-# # location of data
-# data.dir = "/udd/nhych/Marital_status/"
-# data.name = "cc.sas7bdat"
-# 
-# # location of code
-# code.dir = "/udd/nhych/Maya/Code"
-# 
-# # location to save results
-# results.dir = "/udd/nhych/Maya/Results"
-# 
-# # location to save imputations and resamples
-# # (or where to look for them if not running from scratch)
-# stochastic.results.dir = "/udd/nhych/Maya/Results/Objects"
-# 
-# # location of codebook
-# #codebook.dir = "~/Dropbox/Personal computer/Independent studies/Tyler's outcome-wide paper/Linked to OSF (OWP)/Applied example/MIDUS codebooks"
-# 
-# setwd(code.dir)
-# source("helper_applied_example.R")
-# 
-# # read in data
-# setwd(data.dir)
-# 
-# library(sas7bdat)
-# d = read.sas7bdat(data.name)
-
-
-# FOR LOCAL USE
-
-this.analysis = "Marriage - main"
-
-if (this.analysis == "Marriage - main") restrict = "never.married"
-
-root.dir = "/Users/mmathur/Dropbox/Personal computer/Independent studies/Ying's marriage paper"
-
-setwd(root.dir)
-data.dir = paste(root.dir, "[PRIVATE] Data and results/Data/Raw from Ying", sep="/")
-code.dir = paste(root.dir, "Linked to OSF (YMP)/Code", sep="/")
-results.dir = paste(root.dir, "[PRIVATE] Data and results/Results", this.analysis, sep="/")
-
-codebook.dir = paste(root.dir, "[PRIVATE] Data and results/Data", sep="/")
-
-full.imputeds.dir = paste(root.dir, "[PRIVATE] Data and results/Data/Imputed full datasets as csv", sep="/")
-
-# where to save the imputed datasets that have been appropriately restricted, if needed, 
-#  for this particular analysis
-custom.imputeds.dir = paste(root.dir, "[PRIVATE] Data and results/Data/Imputed restricted datasets as csv", this.analysis, sep="/")
-
-
 
 # COMMENTED OUT FOR SPEED
 # # marriage data
@@ -135,9 +157,10 @@ library(readr)
 #d.full = suppressMessages( read.csv("nonrestrict_data.csv") )
 # ~~~ TEST ONLY:
 d.full = suppressMessages( read.csv("nonrestrict_data_TEST_SUBSAMPLE.csv") )
+d.full = d.full %>% filter( !is.na(mars89) )
 
 library(testthat)
-expect_equal( nrow(d.full), 116412) # from my own analysis
+#expect_equal( nrow(d.full), 116412) # from my own analysis
 
 # load the helper code
 setwd(code.dir)
@@ -156,31 +179,33 @@ d = as.data.frame(d)
 
 
 
-########################### CC INITIAL SANITY CHECK: FIT ONE ANALYSIS MODEL BY HAND ########################### 
-y = d$support
-y.centered = ( y - mean(y, na.rm = TRUE) ) / sd( y, na.rm = TRUE )
-  
-( m = lm( y.centered ~ mars93_2 + age + nhwhite + colled + nim89 + region2 + region3 + region4 + mdinc2 + mdinc3 + mdinc4 + exam89 + alco89 + smoke89 + act89_d + number, data = d ) )
-summary(m)
-
-# confirm manually
-m$df.residual + 16
-
-
-
-# look for variable name mismatches
-#  i.e., see which ones aren't in dataset
-# should be NA
-expect_equal( TRUE, is.na( analysis.vars[ !analysis.vars %in% names(d) ] ) )
-analysis.vars[ !analysis.vars %in% names(d) ]
-
-# remove any unnecessary variables 
-# otherwise MI breaks down
-d = d[, names(d) %in% analysis.vars ]
+# ########################### CC INITIAL SANITY CHECK: FIT ONE ANALYSIS MODEL BY HAND ########################### 
+# y = d$support
+# y.centered = ( y - mean(y, na.rm = TRUE) ) / sd( y, na.rm = TRUE )
+# 
+# ( m = lm( y.centered ~ mars93_2 + age + nhwhite + colled + nim89 + region2 + region3 + region4 + mdinc2 + mdinc3 + mdinc4 + exam89 + alco89 + smoke89 + act89_d + number, data = d ) )
+# summary(m)
+# 
+# # confirm manually
+# m$df.residual + 16
+# 
+# 
+# 
+# # look for variable name mismatches
+# #  i.e., see which ones aren't in dataset
+# # should be NA
+# expect_equal( TRUE, is.na( analysis.vars[ !analysis.vars %in% names(d) ] ) )
+# analysis.vars[ !analysis.vars %in% names(d) ]
+# 
+# # remove any unnecessary variables 
+# # otherwise MI breaks down
+# d = d[, names(d) %in% analysis.vars ]
 
 
 
 ########################### DESCRIPTIVE ########################### 
+
+d = d[, names(d) %in% analysis.vars ]
 
 ##### Missingness on Each Variable #####
 sort( apply( d[ , names(d) ], 
@@ -190,8 +215,8 @@ sort( apply( d[ , names(d) ],
 
 ##### Missingness on Each Outcome #####
 sort( apply( d[ , names(d) %in% c(Ylin, Ybin) ], 
-       2, 
-       function(x) sum(is.na(x)) / length(x) ),
+             2, 
+             function(x) sum(is.na(x)) / length(x) ),
       decreasing = TRUE )
 
 
@@ -218,42 +243,6 @@ write.csv( data.frame( name = names( prevalence[ prevalence < .1 ] ) ),
            "list_of_rare_binaries.csv",
            row.names = FALSE )
 
-# 
-# ##### Which Binary Outcomes are Rare? #####
-# # this is used when computing E-values for logistic regression
-# # from most common to least common
-# prevalence = sort( apply( d[ , names(d) %in% Ybin ], 
-#                           2, 
-#                           function(x) sum(x[!is.na(x)]) / length(x[!is.na(x)]) ),
-#                    decreasing = TRUE )
-# # save list of rare binaries for use in analysis post-processing
-# setwd(results.dir)
-# write.csv( data.frame( name = names( prevalence[ prevalence < .1 ] ) ),
-#            "list_of_rare_binaries.csv",
-#            row.names = FALSE )
-
-########################### MAKE IMPUTATIONS (OR READ THEM IN) ########################### 
-
-# # imputation parameters
-# missingness = "MI" # missing data method ("MI" or "CC")
-# impute.from.scratch = FALSE
-# 
-# # number of imputations
-# # increase above 5 because some vars have >30% missingness
-# # see Graham "How many imputations are really needed?"
-# M = 10
-# 
-# # should we overwrite previous results files?
-# write.results = TRUE
-# 
-# # this script automatically handles case in which we're not making
-# #  imputations from scratch
-# setwd(code.dir)
-# source("make_imputations.R")
-# 
-# # look at one imputed dataset
-# library(tableone)
-# CreateTableOne(data=imps[[1]], includeNA=TRUE)
 
 
 ########################### RECODE VARIABLES ###########################
@@ -263,15 +252,6 @@ write.csv( data.frame( name = names( prevalence[ prevalence < .1 ] ) ),
 library(tableone)
 CreateTableOne(data=d, includeNA = TRUE)
 
-# recode binaries
-# fn automatically checks whether variable actually is binary
-
-# # not elegant, but using apply causes the numerics to 
-# # become factors
-# for ( i in 1:ncol(d) ) {
-#   d[,i] = recode_binary(d[,i])
-# }
-
 
 ##### Recode the Imputed Datasets #####
 
@@ -280,21 +260,15 @@ setwd(full.imputeds.dir)
 ( M = length( list.files() ) )
 missingness = "MI"
 write.results = TRUE
-  
+
 # read in each relevant imputed dataset as csv and modify it directly
 for ( i in 1:M ) {
-  # bm
   setwd(full.imputeds.dir)
   imp = as.data.frame( suppressMessages( read_csv( paste("imputed_dataset_", i, ".csv", sep="") ) ) )
-
-  # # recode the binaries
-  # for ( j in 1:ncol(imp) ) {
-  #   imp[,j] = binarize(imp[,j])
-  # }
   
   imp = make_derived_vars( imp,
-                          var.names = Ylin,
-                          restrict = "never.married" )
+                           var.names = Ylin,
+                           restrict = restrict )
   # write to folder that is specific to this analysis
   setwd( custom.imputeds.dir )
   write.csv( imp, paste("imputed_dataset_", i, ".csv", sep="") )
@@ -332,6 +306,11 @@ CreateTableOne(data = imps[[3]])
 
 # dry run: OLS with no resampling
 
+cat("\n\n")
+cat("**************** Starting RUN #0 ****************")
+
+run.name = "run0"
+
 # set link ("OLS", "poisson", "logistic")
 # spelling needs to match options within function fit_model
 link = "OLS"
@@ -355,14 +334,24 @@ alpha.within = 0.05
 setwd(code.dir)
 source("analysis_general.R")
 
+cat("**************** Finished RUN #0 ****************")
 
-########################### RUN #1: OLS / resample = FALSE / TMLE = FALSE ########################### 
+
+########################### RUN #1: OLS / resample = TRUE / TMLE = FALSE ########################### 
+
+
+cat("\n\n")
+cat("**************** Starting RUN #1 ****************")
+
+run.name = "run1"
 
 # we will now run analysis_general.R once for each of four model specifications:
 # OLS / resample = TRUE / TMLE = FALSE
 # OLS / resample = FALSE / TMLE = TRUE
 # logistic / resample = FALSE / TMLE = FALSE
 # logistic / resample = FALSE / TMLE = TRUE
+
+# bm
 
 # set link ("OLS", "poisson", "logistic")
 # spelling needs to match options within function fit_model
@@ -378,9 +367,9 @@ write.results = TRUE
 # should we run from saved imputations or re-impute?
 
 # no resampling
-resample = FALSE
-resample.from.scratch = FALSE
-# B.resamp = 1000 # number of resamples (~~ increase this)
+resample = TRUE
+resample.from.scratch = TRUE
+B.resamp = 500 # number of resamples (~~ increase this)
 
 # familywise alpha
 # we always set this to 0.05
@@ -393,15 +382,15 @@ alpha.within = 0.05
 setwd(code.dir)
 source("analysis_general.R")
 
+cat("**************** Finished RUN #1 ****************")
+
 
 ########################### RUN #2: OLS / resample = FALSE / TMLE = TRUE ########################### 
 
+cat("\n\n")
+cat("**************** Starting RUN #2 ****************")
 
-# we will now run analysis_general.R once for each of four model specifications:
-# OLS / resample = TRUE / TMLE = FALSE
-# OLS / resample = FALSE / TMLE = TRUE
-# logistic / resample = FALSE / TMLE = FALSE
-# logistic / resample = FALSE / TMLE = TRUE
+run.name = "run2"
 
 # set link ("OLS", "poisson", "logistic")
 # spelling needs to match options within function fit_model
@@ -420,9 +409,14 @@ resample.from.scratch = FALSE
 setwd(code.dir)
 source("analysis_general.R")
 
-# bm
+cat("**************** Finished RUN #2 ****************")
 
 ########################### RUN #3: logistic / resample = FALSE / TMLE = FALSE ########################### 
+
+cat("\n\n")
+cat("**************** Starting RUN #3 ****************")
+
+run.name = "run3"
 
 # set link ("OLS", "poisson", "logistic")
 # spelling needs to match options within function fit_model
@@ -438,10 +432,15 @@ write.results = TRUE
 setwd(code.dir)
 source("analysis_general.R")
 
-
+cat("**************** Finished RUN #3 ****************")
 
 
 ########################### RUN #4: logistic / resample = FALSE / TMLE = TRUE ########################### 
+
+cat("\n\n")
+cat("**************** Starting RUN #4 ****************")
+
+run.name = "run4"
 
 # set link ("OLS", "poisson", "logistic")
 # spelling needs to match options within function fit_model
@@ -471,6 +470,9 @@ setwd(code.dir)
 source("helper_applied_example.R")
 source("analysis_general.R")
 
+cat("**************** Finished RUN #4 ****************")
+
+
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ # 
 #                                  CC RESULTS                                #
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ # 
@@ -478,6 +480,11 @@ source("analysis_general.R")
 missingness = "CC"
 
 ########################### RUN #5: OLS CC, regular MLE ###########################
+
+cat("\n\n")
+cat("**************** Starting RUN #5 ****************")
+
+run.name = "run5"
 
 # set link ("OLS", "poisson", "logistic")
 # spelling needs to match options within function fit_model
@@ -489,12 +496,17 @@ TMLE = FALSE
 setwd(code.dir)
 source("analysis_general.R")
 
+cat("**************** Finished RUN #5 ****************")
+
 
 
 ########################### RUN #6: LOGISTIC CC, regular MLE ###########################
 
-# set link ("OLS", "poisson", "logistic")
-# spelling needs to match options within function fit_model
+cat("\n\n")
+cat("**************** Starting RUN #6 ****************")
+
+run.name = "run6"
+
 link = "logistic"
 
 # TMLE or standard MLE?
@@ -504,11 +516,46 @@ TMLE = FALSE
 setwd(code.dir)
 source("analysis_general.R")
 
+cat("**************** Finished RUN #6 ****************")
+
 
 ########################### RUN #7: OLS CC, TMLE ###########################
 
 
+cat("\n\n")
+cat("**************** Starting RUN #7 ****************")
+
+run.name = "run7"
+
+link = "OLS"
+
+# TMLE or standard MLE?
+TMLE = TRUE
+
+setwd(code.dir)
+source("analysis_general.R")
+
+cat("**************** Finished RUN #7 ****************")
+
+
 ########################### RUN #8: LOGISTIC CC, TMLE ###########################
+
+cat("\n\n")
+cat("**************** Starting RUN #8 ****************")
+
+run.name = "run8"
+
+link = "logistic"
+
+# TMLE or standard MLE?
+TMLE = TRUE
+
+setwd(code.dir)
+source("analysis_general.R")
+
+cat("**************** Finished RUN #8 ****************")
+
+
 
 
 
@@ -516,7 +563,7 @@ source("analysis_general.R")
 #                             MERGE RESULTS FILES                            #
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ # 
 
-analysis.dir.name = "Marriage"
+analysis.dir.name = this.analysis
 
 
 setwd(code.dir)

@@ -1,8 +1,6 @@
 
 ############################## SET YOUR DIRECTORY LOCATIONS ############################## 
 
-rm(list=ls())
-
 # # FOR CHANNING USE
 # # location of data
 # data.dir = "/udd/nhych/Marital_status/"

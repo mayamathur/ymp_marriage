@@ -49,9 +49,48 @@ standardize = function(x) {
 
 # var.names: variable names to standardize (otherwise standardizes all
 #  continuous vars)
+# restrict: "never.married" (for marriage analyses), "married" (for divorce analyses), or "no"
 make_derived_vars = function(dat,
-                             var.names = NULL) {
+                             var.names = NULL, 
+                             restrict) {
   
+  ##### Make Exposure Variable Indicators (Marital/Divorce Status in 1993) ######
+  # from Ying's code "NHS2.sas":
+  # /*EXPOSURE: Marital status (1993)*/
+  #   if nvmar93=1 then mars93=1;  *never married;
+  #   else if marry93=1 then mars93=2; *married;
+  #   else if div93=1 then mars93=3; *divorced or separated;
+  #   else if widow93=1 then mars93=4; *widowed;
+  
+  # make mars93_2 (married in 1993)
+  dat$mars93_2 = as.numeric(dat$mars93 == 2)
+  
+  # make mars93_3 (divorced in 1993)
+  dat$mars93_3 = as.numeric(dat$mars93 == 3)
+  
+  
+  ##### Restrict Dataset If Necessary #####
+  # this should be done before standardization
+  if ( restrict == "never.married" ) dat = dat %>% filter( mars89 == 1)  # never married
+  if ( restrict == "married" ) dat = dat %>% filter( mars89 == 2)  # currently married
+  
+  ##### Expand Categoricals Into Dummies #####
+  library(fastDummies)
+  dat = dummy_cols( dat, 
+                     select_columns = c("region", "mdinc_c", "mars89"), # last one is for cheating controlled analyses
+                     ignore_na = TRUE )
+  
+  # rename the dummy columns for consistency with SAS code
+  library(stringr)
+  names(dat) = str_replace( names(dat),
+                            pattern = "region_",
+                            replacement = "region" )
+  
+  names(dat) = str_replace( names(dat),
+                            pattern = "mdinc_c_",
+                            replacement = "mdinc" )
+  
+  ##### Standardize Continuous Variables #####
   # if no var.names provided, standardize all continuous vars
   if ( is.null(var.names) ) {
     # find all continuous variables in dataset, not just continuous
@@ -75,6 +114,7 @@ make_derived_vars = function(dat,
                               function(x) standardize(x) )
   }
  
+  ##### Make Binary Dietary Quality Variable #####
   # dichotomize the dietary quality score variable at its top tertile
   cutoff = as.numeric( quantile( dat$nAHEI11a, 2/3, na.rm = TRUE ) )
   temp = rep(NA, nrow(dat))
@@ -547,7 +587,7 @@ dataset_result = function( d,
   resid.lengths = lapply( lists, function(x) length(x$resids) )
   resid.lengths = unlist( resid.lengths ) 
   if( length( unique(resid.lengths) ) == 1 ) {
-    mat = matrix( u[ grepl( "resid", names(u) ) ], byrow=FALSE, ncol=length(Ys) ) 
+    mat = matrix( u[ grepl( "resids", names(u) ) ], byrow=FALSE, ncol=length(Ys) ) 
   } else {
     warning("Outcome models had different sample sizes (probably due to missing data), so not returning residuals.")
     mat = matrix( NA, byrow=FALSE, ncol=length(Ys) ) 
@@ -594,6 +634,7 @@ resample_resid = function( d,
   if ( B < 1000 ) warning("Number of resamples is too small to ensure good asymptotic behavior of resampling.")
   
   # compute Y-hat using residuals
+  browser()
   Yhat = d[, Ys] - resid
   
   # fix the existing covariates

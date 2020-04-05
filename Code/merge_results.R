@@ -309,55 +309,53 @@ ggsave("forest_plot.png",
 
 ########################### META-ANALYZE ###########################
 
-# be wary of CIs because not independent
-library(metafor)
-( meta = rma.uni( yi = d$yi,
-                  vi = d$vi,
-                  method = "REML",
-                  knha = TRUE ) )
-exp(meta$b)
-
-# look at normality
-hist( d$yi - meta$b ) / sqrt(d$vi)
-
-# estimate proportion of effects
-if ( meta$b > 0 ) {
-  library(EValue)
-  stronger_than( q = log(1.1),
-                 yr = meta$b,
-                 vyr = meta$se^2,
-                 t2 = meta$tau2,
-                 vt2 = meta$se.tau2^2,
-                 tail = "above" )
-  
-  # sensitivity analysis
-  confounded_meta( q = log(1.1), 
-                   r = .1, 
-                   yr = meta$b,
-                   vyr = meta$se^2,
-                   t2 = meta$tau2,
-                   vt2 = meta$se.tau2^2,
-                   tail = "above" )
-}
-
-if ( meta$b < 0 ) {
-  library(EValue)
-  stronger_than( q = log(.9),
-                 yr = meta$b,
-                 vyr = meta$se^2,
-                 t2 = meta$tau2,
-                 vt2 = meta$se.tau2^2,
-                 tail = "below" )
-  
-  # sensitivity analysis
-  confounded_meta( q = log(.9), 
-                   r = .1, 
-                   yr = meta$b,
-                   vyr = meta$se^2,
-                   t2 = meta$tau2,
-                   vt2 = meta$se.tau2^2,
-                   tail = "below" )
-}
+# # be wary of CIs because not independent
+# library(metafor)
+# ( meta = rma.uni( yi = d$yi,
+#                   vi = d$vi,
+#                   method = "REML",
+#                   knha = TRUE ) )
+# exp(meta$b)
+# 
+# 
+# # estimate proportion of effects
+# if ( meta$b > 0 ) {
+#   library(EValue)
+#   stronger_than( q = log(1.1),
+#                  yr = meta$b,
+#                  vyr = meta$se^2,
+#                  t2 = meta$tau2,
+#                  vt2 = meta$se.tau2^2,
+#                  tail = "above" )
+#   
+#   # sensitivity analysis
+#   confounded_meta( q = log(1.1), 
+#                    r = .1, 
+#                    yr = meta$b,
+#                    vyr = meta$se^2,
+#                    t2 = meta$tau2,
+#                    vt2 = meta$se.tau2^2,
+#                    tail = "above" )
+# }
+# 
+# if ( meta$b < 0 ) {
+#   library(EValue)
+#   stronger_than( q = log(.9),
+#                  yr = meta$b,
+#                  vyr = meta$se^2,
+#                  t2 = meta$tau2,
+#                  vt2 = meta$se.tau2^2,
+#                  tail = "below" )
+#   
+#   # sensitivity analysis
+#   confounded_meta( q = log(.9), 
+#                    r = .1, 
+#                    yr = meta$b,
+#                    vyr = meta$se^2,
+#                    t2 = meta$tau2,
+#                    vt2 = meta$se.tau2^2,
+#                    tail = "below" )
+# }
 
 
 # ########################### NICELY REFORMAT TABLES ###########################

@@ -15,6 +15,11 @@ if ( link == "logistic" ) Ynames = Ybin
 if ( missingness == "CC" ) Cnames = Cnames.CC else Cnames = Cnames.MI
 
 
+# HUGE try-catch loop for entire analysis script
+# this will write a csv file with the run's name and error message if it fails
+# run names are as in analysis_master.R
+tryCatch({
+
 
 ###########################  ANALYSES ########################### 
 
@@ -246,11 +251,15 @@ if ( missingness == "CC" ) {
   analyzed.n = res$samp.res$analyzed.n
   
   if ( link == "OLS" ) {
-    lo.pool = bhats.pool - qnorm( p = 1 - alpha/2 ) * ses.pool
-   hi.pool = bhats.pool + qnorm( p = 1 - alpha/2 ) * ses.pool
-  } else {
+    
+    ( df = analyzed.n - 2 - length(Cnames) )  
+    
     lo.pool = bhats.pool - qt( p = 1 - alpha/2, df = df ) * ses.pool
     hi.pool = bhats.pool + qt( p = 1 - alpha/2, df = df ) * ses.pool
+    
+  } else {
+    lo.pool = bhats.pool - qnorm( p = 1 - alpha/2 ) * ses.pool
+    hi.pool = bhats.pool + qnorm( p = 1 - alpha/2 ) * ses.pool
   }
 }
 
@@ -333,9 +342,11 @@ if ( link == "logistic" ) {
   rares = read.csv("list_of_rare_binaries.csv",
                    header = TRUE)$name
   if( length(rares) > 0 ) message( paste("You fit logistic regression to the following rare binary variables: ",
-                                         rares, ". For these variables, E-values will use sqrt(OR) to approximate RR.",
+                                         paste(rares, collapse = " "), ". For these variables, E-values will use sqrt(OR) to approximate RR.",
                                          sep = "") )
   
+  
+  # bm
   evals.pt = vapply( 1:length(bhats.pool),
                      function(i) suppressMessages( evalues.OR( est = exp( bhats.pool[i] ),
                                              lo = exp( lo.pool[i] ),
@@ -435,6 +446,7 @@ if ( TMLE == FALSE & missingness == "MI" ) {
       pval.man = 2 * ( 1 - pt( t,
                                df = df ) )
 
+      # bm
       lo.man = bhat.pool.man - qt(.975, df = df) * se.pool.man
       hi.man = bhat.pool.man + qt(.975, df = df) * se.pool.man
     }
@@ -591,7 +603,8 @@ if ( write.results == TRUE ) {
   
   flavor = ifelse( TMLE == TRUE, "tmle", "nontmle")
   
-  string = paste( "table2",
+  string = paste( run.name,
+                  "table2",
                   link,
                   flavor,
                   missingness,
@@ -601,7 +614,8 @@ if ( write.results == TRUE ) {
   write.csv(table2, string)
   
   
-  string = paste( "table3",
+  string = paste( run.name,
+                  "table3",
                   link,
                   flavor,
                   missingness,
@@ -661,7 +675,8 @@ if ( missingness == "MI") {
                                            pval = CCres$samp.res$pvals) ) )
   
   # write results
-  string = paste( "table2",
+  string = paste( run.name,
+                  "table2",
                   link,
                   "nontmle",
                   "CCsanity",
@@ -673,5 +688,15 @@ if ( missingness == "MI") {
   
 }
 
+# end of HUGE try-catch loop for entire analysis script
+}, error = function(err){
+  setwd(results.dir)
+  write.csv( file = paste("*",
+                   run.name, 
+                   "_ERROR",
+                   sep = ""),
+             x = err$message )
+  stop("Run had an error! See csv file")
+})
 
 
