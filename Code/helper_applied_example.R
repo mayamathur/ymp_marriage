@@ -634,7 +634,6 @@ resample_resid = function( d,
   if ( B < 1000 ) warning("Number of resamples is too small to ensure good asymptotic behavior of resampling.")
   
   # compute Y-hat using residuals
-  browser()
   Yhat = d[, Ys] - resid
   
   # fix the existing covariates

@@ -12,10 +12,11 @@ setwd(results.dir)
 digits = 2
 
 # cbind the OLS and logistic ones
-tmle = rbind( read.csv("table2_OLS_tmle_MI_.csv"),
-              read.csv("table2_logistic_tmle_MI_.csv") )
-non = rbind( read.csv("table2_OLS_nontmle_MI_.csv"),
-             read.csv("table2_logistic_nontmle_MI_.csv") )
+tmle = rbind( read.csv("run2_table2_OLS_tmle_MI_.csv"),
+              read.csv("run4_table2_logistic_tmle_MI_.csv") )
+
+non = rbind( read.csv("run1_table2_OLS_nontmle_MI_.csv"),
+             read.csv("run3_table2_logistic_nontmle_MI_.csv") )
 
 ##### Point Estimate #####
 same.sign = sign(tmle$Est.Unrounded) == sign(non$Est.Unrounded)

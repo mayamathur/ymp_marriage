@@ -120,7 +120,7 @@ if ( missingness == "MI" ) {
   
   # save stochastic resamples for reproducibility
   if ( write.results == TRUE & link == "OLS" & resample == TRUE & resample.from.scratch == TRUE ) {
-    setwd( stochastic.results.dir )
+    setwd( resampling.results.dir )
     
     # remove period from alpha-level
     if (alpha.within == 0.05) alpha.string = "alpha005"
@@ -200,7 +200,7 @@ if ( link == "OLS" & resample == TRUE ) {
     if (alpha.within == 0.05) alpha.string = "alpha005"
     if (alpha.within == 0.01) alpha.string = "alpha001"
     
-    setwd( stochastic.results.dir )
+    setwd( resampling.results.dir )
     p.bt = read.csv( paste( "resampled_OLS_pvals", "_", alpha.string, ".csv", sep="" ) )
     t.bt = read.csv( paste( "resampled_OLS_tvals", "_", alpha.string, ".csv", sep="" ) )
     rej.bt = read.csv( paste( "resampled_OLS_rej", "_", alpha.string, ".csv", sep="" ) )

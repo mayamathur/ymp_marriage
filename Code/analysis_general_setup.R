@@ -36,28 +36,43 @@
 rm(list=setdiff(ls(),
                 c("this.analysis",
                 "analyses",
-                "i")))
+                ".a",
+                "data.dir", 
+                "code.dir",
+                "custom.imputeds.dir",
+                "full.imputeds.dir",
+                "resampling.results.dir",
+                "codebook.dir",
+                "results.dir",
+                "root.dir"
+                )))
+
+
 
 
 if (this.analysis == "Marriage - main") restrict = "never.married"
 if (this.analysis == "Divorce - main") restrict = "married"
 if ( grepl(pattern = "cheating", this.analysis) == TRUE ) restrict = "no"
 
-root.dir = "/Users/mmathur/Dropbox/Personal computer/Independent studies/Ying's marriage paper"
+# root.dir = "/Users/mmathur/Dropbox/Personal computer/Independent studies/Ying's marriage paper"
+# 
+# setwd(root.dir)
+# data.dir = paste(root.dir, "[PRIVATE] Data and results/Data/Raw from Ying", sep="/")
+# code.dir = paste(root.dir, "Linked to OSF (YMP)/Code", sep="/")
+# results.dir = paste(root.dir, "[PRIVATE] Data and results/Results", this.analysis, sep="/")
+# 
+# codebook.dir = paste(root.dir, "[PRIVATE] Data and results/Data", sep="/")
+# 
+# full.imputeds.dir = paste(root.dir, "[PRIVATE] Data and results/Data/Imputed full datasets as csv", sep="/")
+# 
+# resampling.results.dir = paste(root.dir, "[PRIVATE] Data and results/Data/Stochastic resampling results", sep="/")
+# 
+# # where to save the imputed datasets that have been appropriately restricted, if needed, 
+# #  for this particular analysis
+# custom.imputeds.dir = paste(root.dir, "[PRIVATE] Data and results/Data/Imputed restricted datasets as csv", this.analysis, sep="/")
 
-setwd(root.dir)
-data.dir = paste(root.dir, "[PRIVATE] Data and results/Data/Raw from Ying", sep="/")
-code.dir = paste(root.dir, "Linked to OSF (YMP)/Code", sep="/")
-results.dir = paste(root.dir, "[PRIVATE] Data and results/Results", this.analysis, sep="/")
 
-codebook.dir = paste(root.dir, "[PRIVATE] Data and results/Data", sep="/")
-
-full.imputeds.dir = paste(root.dir, "[PRIVATE] Data and results/Data/Imputed full datasets as csv", sep="/")
-
-# where to save the imputed datasets that have been appropriately restricted, if needed, 
-#  for this particular analysis
-custom.imputeds.dir = paste(root.dir, "[PRIVATE] Data and results/Data/Imputed restricted datasets as csv", this.analysis, sep="/")
-
+library(doParallel)
 
 ############################## SET VARIABLE NAMES ############################## 
 
@@ -171,7 +186,7 @@ source("helper_applied_example.R")
 d = make_derived_vars(d.full,
                       var.names = Ylin,
                       restrict = restrict)
-nrow(d)  # 15,093
+nrow(d)  
 # sanity check
 expect_equal( all(d$mars89) == 1, TRUE )
 
@@ -366,7 +381,7 @@ write.results = TRUE
 # resampling parameters
 # should we run from saved imputations or re-impute?
 
-# no resampling
+# resampling
 resample = TRUE
 resample.from.scratch = TRUE
 B.resamp = 500 # number of resamples (~~ increase this)
@@ -493,8 +508,15 @@ link = "OLS"
 # TMLE or standard MLE?
 TMLE = FALSE
 
+# # no resampling
+# resample = FALSE
+# resample.from.scratch = TRUE
+# B.resamp = 500 # number of resamples (~~ increase this)
+
 setwd(code.dir)
 source("analysis_general.R")
+
+# bm
 
 cat("**************** Finished RUN #5 ****************")
 
@@ -511,6 +533,8 @@ link = "logistic"
 
 # TMLE or standard MLE?
 TMLE = FALSE
+
+resample = FALSE
 
 
 setwd(code.dir)

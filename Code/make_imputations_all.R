@@ -1,14 +1,14 @@
 
  
-# FOR LOCAL USE
-root.dir = "/Users/mmathur/Dropbox/Personal computer/Independent studies/Ying's marriage paper"
-
-setwd(root.dir)
-data.dir = paste(root.dir, "[PRIVATE] Data and results/Data/Raw from Ying", sep="/")
-code.dir = paste(root.dir, "Linked to OSF (YMP)/Code", sep="/")
-results.dir = paste(root.dir, "[PRIVATE] Data and results/Results/Marriage - cheating controlled", sep="/")
-full.imputeds.dir = paste(root.dir, "[PRIVATE] Data and results/Data/Imputed full datasets as csv", sep="/")
-codebook.dir = paste(root.dir, "[PRIVATE] Data and results/Data", sep="/")
+# # FOR LOCAL USE
+# root.dir = "/Users/mmathur/Dropbox/Personal computer/Independent studies/Ying's marriage paper"
+# 
+# setwd(root.dir)
+# data.dir = paste(root.dir, "[PRIVATE] Data and results/Data/Raw from Ying", sep="/")
+# code.dir = paste(root.dir, "Linked to OSF (YMP)/Code", sep="/")
+# results.dir = paste(root.dir, "[PRIVATE] Data and results/Results/Marriage - cheating controlled", sep="/")
+# full.imputeds.dir = paste(root.dir, "[PRIVATE] Data and results/Data/Imputed full datasets as csv", sep="/")
+# codebook.dir = paste(root.dir, "[PRIVATE] Data and results/Data", sep="/")
 
 
 # # COMMENTED OUT FOR SPEED
@@ -23,27 +23,30 @@ codebook.dir = paste(root.dir, "[PRIVATE] Data and results/Data", sep="/")
 
 setwd(data.dir)
 library(readr)
-d = suppressMessages( read.csv("nonrestrict_data.csv") )
 
-# create table one before taking random sample
-library(tableone)
-CreateTableOne(data=d, includeNA=TRUE)
-
+# # REAL VERSION:
+# d = suppressMessages( read.csv("nonrestrict_data.csv") )
+# # create table one before taking random sample
+# library(tableone)
+# CreateTableOne(data=d, includeNA=TRUE)
 
 # ~~~ TEMP ONLY:
 # ~~~ for dry run: FAKE ONLY
-library(dplyr)
-d = sample_n( d, size = 3000 )  # TEMP ONLY!!!
-write.csv(d, "nonrestrict_data_TEST_SUBSAMPLE.csv")
+# library(dplyr)
+# d = sample_n( d, size = 3000 )  # TEMP ONLY!!!
+# write.csv(d, "nonrestrict_data_TEST_SUBSAMPLE.csv")
+# TEMP ONLY: 
+d = suppressMessages( read.csv("nonrestrict_data_TEST_SUBSAMPLE.csv") )
+
 
 library(testthat)
-expect_equal( nrow(d), 116412) # based on my own analysis
+#expect_equal( nrow(d), 116412) # based on my own analysis
 
 d = as.data.frame(d)
 
 # keep only those with non-missing marital status in 1989
 d = d %>% filter( !is.na(mars89) )
-expect_equal( nrow(d), 116144)
+#expect_equal( nrow(d), 116144)
 
 # fake = d # safekeeping
 
@@ -127,7 +130,7 @@ library(mice)
 ##### Generate Imputations #####
 ini = mice(d, m=1, maxit = 0 )
 ini$loggedEvents
-if ( !is.null(ini$loggedEvents) ) stop("Imputation trouble: Dry run has logged events! Adjust the code in make_imputations.R.")
+if ( !is.null(ini$loggedEvents) ) warning("Imputation trouble: Dry run has logged events! Adjust the code in make_imputations_all.R.")
 
 # check default methods
 ini$method
@@ -142,7 +145,7 @@ ini$method
 pred = quickpred(d)
 
 # # vars that mice considers too collinear don't get imputed at all
-# #  intervene to stop this behavior
+# #  intervene to warning this behavior
 # problem.vars = ini$loggedEvents$out
 # pred[problem.vars,] = 1
 # pred[,problem.vars] = 1
@@ -157,12 +160,12 @@ imps = mice( d,
 
 # any complaints?
 head(imps$loggedEvents)
-if ( !is.null(imps$loggedEvents) ) stop("Imputation trouble: Imputations have logged events! Adjust the code in make_imputations.R.")
+if ( !is.null(imps$loggedEvents) ) warning("Imputation trouble: Imputations have logged events! Adjust the code in make_imputations_all.R.")
 
 
 # make sure there is no missing data in the imputations
 any.missing = apply( complete(imps,1), 2, function(x) any(is.na(x)) ) # should be FALSE
-if ( any(any.missing) == TRUE ) stop("Imputed datasets have missing data! Look at logged events.")
+if ( any(any.missing) == TRUE ) warning("Imputed datasets have missing data! Look at logged events.")
 
 
 # first imputed dataset
@@ -319,7 +322,7 @@ if ( write.results == TRUE ) {
 #     ##### Generate Imputations #####
 #     ini = mice(d, m=1, maxit = 0 )
 #     ini$loggedEvents
-#     if ( !is.null(ini$loggedEvents) ) stop("Imputation trouble: Dry run has logged events! Adjust the code in make_imputations.R.")
+#     if ( !is.null(ini$loggedEvents) ) warning("Imputation trouble: Dry run has logged events! Adjust the code in make_imputations.R.")
 #     
 #     # check default methods
 #     ini$method
@@ -334,7 +337,7 @@ if ( write.results == TRUE ) {
 #     pred = quickpred(d)
 #     
 #     # # vars that mice considers too collinear don't get imputed at all
-#     # #  intervene to stop this behavior
+#     # #  intervene to warning this behavior
 #     # problem.vars = ini$loggedEvents$out
 #     # pred[problem.vars,] = 1
 #     # pred[,problem.vars] = 1
@@ -347,12 +350,12 @@ if ( write.results == TRUE ) {
 #     
 #     # any complaints?
 #     head(imps$loggedEvents)
-#     if ( !is.null(imps$loggedEvents) ) stop("Imputation trouble: Imputations have logged events! Adjust the code in make_imputations.R.")
+#     if ( !is.null(imps$loggedEvents) ) warning("Imputation trouble: Imputations have logged events! Adjust the code in make_imputations.R.")
 #     
 #     
 #     # make sure there is no missing data in the imputations
 #     any.missing = apply( complete(imps,1), 2, function(x) any(is.na(x)) ) # should be FALSE
-#     if ( any(any.missing) == TRUE ) stop("Imputed datasets have missing data! Look at logged events.")
+#     if ( any(any.missing) == TRUE ) warning("Imputed datasets have missing data! Look at logged events.")
 #   
 #     
 #     # first imputed dataset
